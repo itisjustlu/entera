@@ -1,0 +1,69 @@
+version: "3.9"
+
+services:
+  db:
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5435:5432"
+  redis:
+    image: redis:7.0.7
+    volumes:
+      - redis_volume:/var/lib/redis/data:cached
+  api:
+    image: api
+    build:
+      context : ./api
+      dockerfile: Dockerfile
+    volumes:
+      - ./api/:/app
+      - gems_volume:/gems:cached
+    ports:
+      - "3000:3000"
+    environment:
+      BUNDLE_PATH: /gems
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_PORT: 5432
+      DB_NAME: api
+      DB_HOST: db
+      PORT: 3000
+      SECRET_TOKEN: Wa4Kdu6hMt3tYKm4jb9p4vZUuc7jBVFw
+      SECRET_KEY_BASE: Wa4Kdu6hMt3tYKm4jb9p4vZUuc7jBVFw
+      JWT_SECRET: Wa4Kdu6hMt3tYKm4jb9p4vZUuc7jBVFw
+      REDIS_URL: redis://redis:6379
+    command: bundle exec rails server -b 0.0.0.0
+    tty: true
+    stdin_open: true
+    env_file:
+      - ./api/.env
+    depends_on:
+      - db
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    command: bash -c "yarn --silent && yarn dev"
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./web:/app
+      - ./web/node_modules:/app/node_modules
+    environment:
+      NODE_ENV: "development"
+      PUBLIC_URL: "http://localhost:3001"
+      PORT: 3001
+      API_URL: "http://api:3000/api/v1"
+      NEXT_PUBLIC_API_URL: "http://localhost:3000/api/v1"
+    env_file:
+      - ./web/.env
+    depends_on:
+      - api
+volumes:
+  pgdata:
+  gems_volume:
+  redis_volume:
